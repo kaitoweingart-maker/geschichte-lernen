@@ -51,6 +51,29 @@
 
   const COUNTRIES_DATA = window.COUNTRIES_DATA || {};
 
+  // ---------- Lern-Tracking via LocalStorage ----------
+  const LS_KEY = 'atlas-historica:learned';
+  const learned = new Set(loadLearned());
+  function loadLearned(){
+    try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); }
+    catch(e){ return []; }
+  }
+  function saveLearned(){
+    try { localStorage.setItem(LS_KEY, JSON.stringify([...learned])); } catch(e){}
+  }
+  function setLearned(iso, on){
+    if (on) learned.add(iso); else learned.delete(iso);
+    saveLearned();
+    updateProgressCount();
+    refreshAllStyles();
+    syncLearnedButton(iso);
+  }
+  function updateProgressCount(){
+    const el = document.getElementById('progress-count');
+    if (el) el.textContent = learned.size;
+  }
+  updateProgressCount();
+
   // ---------- DOM Refs ----------
   const $ = sel => document.querySelector(sel);
   const map = L.map('map', { worldCopyJump:true, zoomControl:true, minZoom:2, maxZoom:6 }).setView([25, 15], 2);
@@ -97,6 +120,10 @@
     }
     if (hover) {
       return { fillColor:'#d6a55c', color:'#fff', weight:1.0, fillOpacity:0.85 };
+    }
+    const isLearned = learned.has(iso);
+    if (isLearned) {
+      return { fillColor:'#3d6e4e', color:'#7be0a6', weight:0.9, fillOpacity:0.92 };
     }
     if (neighbor) {
       return { fillColor:'#3a4d80', color:'#fff', weight:0.7, fillOpacity:0.85 };
@@ -174,6 +201,9 @@
         stats.appendChild(el);
       });
     }
+
+    // KEY DATES (Strip mit wichtigsten Jahren)
+    renderKeyDates(d.events || []);
 
     // OVERVIEW
     $('#tab-overview').innerHTML = `
@@ -258,17 +288,64 @@
 
     // Tabs zurücksetzen
     setActiveTab('overview');
+    syncLearnedButton(currentIso);
     $('#content-pane').scrollTo({top:0, behavior:'smooth'});
   }
+
+  // ---------- Key-Dates Strip ----------
+  function renderKeyDates(events){
+    const strip = $('#key-dates');
+    if (!strip) return;
+    if (!events || events.length === 0) { strip.innerHTML=''; strip.hidden=true; return; }
+    strip.hidden = false;
+    // Bis zu 6 wichtigste Daten (gleichmäßig über Liste verteilt für gute Spannweite)
+    const picks = pickKeyDates(events, 6);
+    strip.innerHTML = picks.map(e => `
+      <div class="key-date" title="${e.title.replace(/"/g,'&quot;')}">
+        <div class="key-date-year">${e.year}</div>
+        <div class="key-date-label">${shortLabel(e.title)}</div>
+      </div>
+    `).join('');
+  }
+  function pickKeyDates(events, n){
+    if (events.length <= n) return events;
+    const idxs = [];
+    for (let i = 0; i < n; i++) {
+      idxs.push(Math.round(i * (events.length-1) / (n-1)));
+    }
+    return [...new Set(idxs)].map(i => events[i]);
+  }
+  function shortLabel(s){
+    if (!s) return '';
+    if (s.length <= 28) return s;
+    return s.slice(0,26).trim() + '…';
+  }
+
+  // ---------- "Gelernt"-Button ----------
+  function syncLearnedButton(iso){
+    const btn = $('#learned-btn');
+    if (!btn) return;
+    const on = learned.has(iso);
+    btn.classList.toggle('is-learned', on);
+    btn.querySelector('.learned-icon').textContent = on ? '●' : '○';
+    btn.querySelector('.learned-text').textContent = on ? 'Gelernt' : 'Als gelernt markieren';
+  }
+  $('#learned-btn').addEventListener('click', () => {
+    if (!currentIso) return;
+    setLearned(currentIso, !learned.has(currentIso));
+  });
 
   // ---------- Wikipedia-Fallback ----------
   function renderLoading(name){
     $('#c-region').textContent = 'Wikipedia-Inhalt';
     $('#c-name').textContent = name;
     $('#c-stats').innerHTML = '';
+    $('#key-dates').innerHTML = '';
+    $('#key-dates').hidden = true;
     document.querySelectorAll('.tab-content').forEach(el => el.innerHTML = '');
     $('#tab-overview').innerHTML = '<div class="loading">Lade Inhalte</div>';
     setActiveTab('overview');
+    syncLearnedButton(currentIso);
   }
 
   async function loadWiki(title){
@@ -355,6 +432,77 @@
     const keys = Object.keys(COUNTRIES_DATA);
     const iso = keys[Math.floor(Math.random()*keys.length)];
     openCountry(iso, COUNTRIES_DATA[iso].name);
+  });
+
+  // ---------- Progress-Panel ----------
+  const progressBtn = $('#progress-btn');
+  let progressPanel = null;
+  function buildProgressPanel(){
+    closeProgressPanel();
+    const panel = document.createElement('div');
+    panel.className = 'progress-panel';
+    const total = Object.keys(COUNTRIES_DATA).length;
+    const pct = total ? Math.round(100 * learned.size / total) : 0;
+
+    const items = [...learned].map(iso => {
+      const name = COUNTRIES_DATA[iso]?.name || WIKI_TITLES[iso] || iso;
+      const flag = COUNTRIES_DATA[iso]?.flag || '';
+      return { iso, name, flag };
+    }).sort((a,b) => a.name.localeCompare(b.name,'de'));
+
+    panel.innerHTML = `
+      <h3>Lernfortschritt</h3>
+      <div class="pp-sub">${learned.size} von ${total} kuratierten Ländern · ${pct}%</div>
+      <div class="progress-bar"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
+      ${items.length === 0
+        ? '<div class="pp-empty">Noch nichts als gelernt markiert. Öffne ein Land und klicke „Gelernt".</div>'
+        : `<div class="progress-list">${items.map(it => `
+            <div class="pp-item" data-iso="${it.iso}">
+              <span>${it.flag} ${it.name}</span>
+              <span class="pp-remove" title="Entfernen">✕</span>
+            </div>`).join('')}</div>`
+      }
+      ${items.length > 0 ? '<button class="pp-reset" id="pp-reset">Alle zurücksetzen</button>' : ''}
+    `;
+    document.body.appendChild(panel);
+    progressPanel = panel;
+
+    panel.querySelectorAll('.pp-item').forEach(el => {
+      el.addEventListener('click', e => {
+        const iso = el.dataset.iso;
+        if (e.target.classList.contains('pp-remove')) {
+          setLearned(iso, false);
+          buildProgressPanel();
+        } else {
+          closeProgressPanel();
+          openCountry(iso);
+        }
+      });
+    });
+    const resetBtn = panel.querySelector('#pp-reset');
+    if (resetBtn) resetBtn.addEventListener('click', () => {
+      if (confirm('Alle gelernten Länder zurücksetzen?')) {
+        learned.clear();
+        saveLearned();
+        updateProgressCount();
+        refreshAllStyles();
+        if (currentIso) syncLearnedButton(currentIso);
+        buildProgressPanel();
+      }
+    });
+  }
+  function closeProgressPanel(){
+    if (progressPanel) { progressPanel.remove(); progressPanel = null; }
+  }
+  progressBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    if (progressPanel) closeProgressPanel();
+    else buildProgressPanel();
+  });
+  document.addEventListener('click', e => {
+    if (progressPanel && !progressPanel.contains(e.target) && e.target !== progressBtn && !progressBtn.contains(e.target)) {
+      closeProgressPanel();
+    }
   });
 
   // ---------- Suche ----------
