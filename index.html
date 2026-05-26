@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0e1a">
+<title>Atlas Historica – Weltgeschichte lernen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark">A</div>
+    <div class="brand-text">
+      <div class="brand-title">Atlas Historica</div>
+      <div class="brand-sub">Weltgeschichte · Land für Land</div>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <input id="search" type="search" placeholder="Land suchen … z.B. Türkei" autocomplete="off">
+    <button id="random-btn" title="Zufälliges Land">🎲 Zufall</button>
+  </div>
+</header>
+
+<main class="layout">
+
+  <section class="map-pane">
+    <div id="map"></div>
+    <div class="map-overlay">
+      <div class="legend">
+        <span class="dot dot-curated"></span> Kuratierte Tiefen-Inhalte
+        <span class="dot dot-wiki"></span> Wikipedia-Inhalte
+        <span class="dot dot-neighbor"></span> Nachbarn
+      </div>
+    </div>
+  </section>
+
+  <aside class="content-pane" id="content-pane">
+
+    <div id="welcome" class="welcome">
+      <h1>Willkommen im Atlas Historica</h1>
+      <p class="lead">
+        Klicke auf ein Land in der Karte oder suche es oben.<br>
+        Du lernst dort die <strong>wichtigsten Ereignisse, Kriege und Personen</strong>,
+        die <strong>Beziehungen zu den Nachbarn</strong> sowie <strong>Wohlstand & heutige Verhaltensmuster</strong>.
+      </p>
+      <div class="welcome-grid">
+        <div class="welcome-card" data-iso="CHE">🇨🇭 Schweiz</div>
+        <div class="welcome-card" data-iso="DEU">🇩🇪 Deutschland</div>
+        <div class="welcome-card" data-iso="FRA">🇫🇷 Frankreich</div>
+        <div class="welcome-card" data-iso="USA">🇺🇸 USA</div>
+        <div class="welcome-card" data-iso="CHN">🇨🇳 China</div>
+        <div class="welcome-card" data-iso="JPN">🇯🇵 Japan</div>
+        <div class="welcome-card" data-iso="RUS">🇷🇺 Russland</div>
+        <div class="welcome-card" data-iso="TUR">🇹🇷 Türkei</div>
+        <div class="welcome-card" data-iso="IND">🇮🇳 Indien</div>
+        <div class="welcome-card" data-iso="BRA">🇧🇷 Brasilien</div>
+        <div class="welcome-card" data-iso="EGY">🇪🇬 Ägypten</div>
+        <div class="welcome-card" data-iso="GRC">🇬🇷 Griechenland</div>
+      </div>
+      <p class="hint">Tipp: für ca. 25 Länder gibt es ausführlich kuratierte Inhalte (orange Punkte). Alle anderen Länder werden live aus Wikipedia geladen.</p>
+    </div>
+
+    <article id="country-view" hidden>
+      <header class="country-header">
+        <div>
+          <div class="kicker" id="c-region"></div>
+          <h2 id="c-name"></h2>
+          <div class="quick-stats" id="c-stats"></div>
+        </div>
+        <button class="close-btn" id="close-btn" title="Zurück zur Übersicht">×</button>
+      </header>
+
+      <div class="tabs" id="tabs">
+        <button class="tab active" data-tab="overview">Überblick</button>
+        <button class="tab" data-tab="events">Ereignisse</button>
+        <button class="tab" data-tab="wars">Kriege</button>
+        <button class="tab" data-tab="people">Personen</button>
+        <button class="tab" data-tab="neighbors">Nachbarn</button>
+        <button class="tab" data-tab="wealth">Wohlstand & Heute</button>
+        <button class="tab" data-tab="facts">Fakten</button>
+      </div>
+
+      <section class="tab-content" id="tab-overview"></section>
+      <section class="tab-content" id="tab-events" hidden></section>
+      <section class="tab-content" id="tab-wars" hidden></section>
+      <section class="tab-content" id="tab-people" hidden></section>
+      <section class="tab-content" id="tab-neighbors" hidden></section>
+      <section class="tab-content" id="tab-wealth" hidden></section>
+      <section class="tab-content" id="tab-facts" hidden></section>
+    </article>
+
+  </aside>
+</main>
+
+<div id="search-results" class="search-results" hidden></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="countries-data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
