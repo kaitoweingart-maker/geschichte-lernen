@@ -457,6 +457,7 @@ body{
 /* DETAIL-FENSTER ==================================================== */
 body.modal-open{overflow:hidden}
 .detail-modal{position:fixed;inset:0;z-index:900;display:flex;align-items:center;justify-content:center;padding:24px}
+.detail-modal[hidden]{display:none}
 .detail-backdrop{position:absolute;inset:0;background:rgba(4,6,12,.72);backdrop-filter:blur(3px)}
 .detail-card{
   position:relative;z-index:1;
