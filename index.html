@@ -112,6 +112,15 @@
 
 <div id="search-results" class="search-results" hidden></div>
 
+<!-- Detail-Fenster für Ereignisse & Personen -->
+<div id="detail-modal" class="detail-modal" hidden>
+  <div class="detail-backdrop" id="detail-backdrop"></div>
+  <div class="detail-card" role="dialog" aria-modal="true">
+    <button class="detail-close" id="detail-close" title="Schließen">×</button>
+    <div class="detail-body" id="detail-body"></div>
+  </div>
+</div>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script src="countries-data.js"></script>
 <script src="app.js"></script>

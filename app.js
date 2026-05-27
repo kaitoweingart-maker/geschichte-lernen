@@ -8,7 +8,6 @@
   'use strict';
 
   const GEOJSON_URL = 'https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson';
-  const WIKI_API = (lang, title) => `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`;
 
   // ---------- Wikipedia-Titel-Mapping für Länder ohne kuratierte Inhalte ----------
   // ISO-A3 → deutscher Wikipedia-Seitentitel
@@ -89,6 +88,22 @@
   let countryIndex = {};   // ISO_A3 → feature.layer
   let currentIso = null;
 
+  // ---------- Tab-Verwaltung (Sichtbarkeit & Beschriftung dynamisch) ----------
+  const ALL_TABS = ['overview','events','wars','people','neighbors','wealth','facts'];
+  const DEFAULT_TAB_LABELS = {
+    overview:'Überblick', events:'Ereignisse', wars:'Kriege', people:'Personen',
+    neighbors:'Nachbarn', wealth:'Wohlstand & Heute', facts:'Fakten'
+  };
+  function configureTabs(visible, labels){
+    labels = labels || {};
+    ALL_TABS.forEach(name => {
+      const btn = document.querySelector(`.tab[data-tab="${name}"]`);
+      if (!btn) return;
+      btn.hidden = !visible.includes(name);
+      btn.textContent = labels[name] || DEFAULT_TAB_LABELS[name];
+    });
+  }
+
   // ---------- GeoJSON laden + zeichnen ----------
   fetch(GEOJSON_URL).then(r=>r.json()).then(data=>{
     geoLayer = L.geoJSON(data, {
@@ -165,18 +180,10 @@
 
     if (data) {
       renderCurated(data);
-      flyToFeature(iso);
     } else {
-      const wikiTitle = WIKI_TITLES[iso] || fallbackName || iso;
-      renderLoading(fallbackName || wikiTitle);
-      try {
-        const wiki = await loadWiki(wikiTitle);
-        renderWikiOnly(wiki, fallbackName || wikiTitle);
-      } catch(err) {
-        renderWikiError(fallbackName || wikiTitle, err);
-      }
-      flyToFeature(iso);
+      renderWikiCountry(iso, fallbackName);
     }
+    flyToFeature(iso);
   }
 
   function flyToFeature(iso){
@@ -211,17 +218,30 @@
       <p class="hint" style="color:var(--text-3);font-size:13px;margin-top:8px">Wechsle durch die Tabs oben für Ereignisse, Kriege, Personen, Nachbarn, Wohlstand und Fakten.</p>
     `;
 
-    // EVENTS
+    // EVENTS (anklickbar → Detail-Fenster mit ausführlichem Wikipedia-Text)
     $('#tab-events').innerHTML = `
       <h3>Wichtigste Ereignisse</h3>
+      <p class="tab-hint">Klicke auf ein Ereignis für ausführliche Hintergründe.</p>
       <div class="timeline">
-        ${(d.events||[]).map(e => `
-          <div class="tl-item">
+        ${(d.events||[]).map((e,i) => `
+          <div class="tl-item is-clickable" data-idx="${i}">
             <div class="tl-year">${e.year}</div>
             <div class="tl-body"><strong>${e.title}</strong> — ${e.body}</div>
+            <div class="tl-more">›</div>
           </div>`).join('')}
       </div>
     `;
+    $('#tab-events').querySelectorAll('.tl-item').forEach(el => {
+      el.addEventListener('click', () => {
+        const e = (d.events||[])[parseInt(el.dataset.idx,10)];
+        if (!e) return;
+        openDetail({
+          kicker:'Ereignis · ' + (d.name||''),
+          title:e.title, meta:e.year, lead:e.body,
+          wikiTitle: e.wiki || e.title
+        });
+      });
+    });
 
     // WARS
     $('#tab-wars').innerHTML = `
@@ -234,18 +254,31 @@
         </div>`).join('')}
     `;
 
-    // PEOPLE
+    // PEOPLE (anklickbar → Detail-Fenster mit ausführlicher Biografie)
     $('#tab-people').innerHTML = `
       <h3>Historische Personen</h3>
+      <p class="tab-hint">Klicke auf eine Person für eine ausführliche Biografie.</p>
       <div class="people-grid">
-        ${(d.people||[]).map(p => `
-          <div class="person">
+        ${(d.people||[]).map((p,i) => `
+          <div class="person is-clickable" data-idx="${i}">
             <div class="person-name">${p.name}</div>
             <div class="person-meta">${p.period} · ${p.role}</div>
             <div class="person-desc">${p.desc}</div>
+            <div class="person-more">Mehr lesen ›</div>
           </div>`).join('')}
       </div>
     `;
+    $('#tab-people').querySelectorAll('.person').forEach(el => {
+      el.addEventListener('click', () => {
+        const p = (d.people||[])[parseInt(el.dataset.idx,10)];
+        if (!p) return;
+        openDetail({
+          kicker:'Person · ' + (d.name||''),
+          title:p.name, meta:`${p.period} · ${p.role}`, lead:p.desc,
+          wikiTitle: p.wiki || p.name
+        });
+      });
+    });
 
     // NEIGHBORS
     $('#tab-neighbors').innerHTML = `
@@ -286,7 +319,8 @@
       </div>
     `;
 
-    // Tabs zurücksetzen
+    // Tabs zurücksetzen (alle sichtbar, Standard-Beschriftung)
+    configureTabs(ALL_TABS);
     setActiveTab('overview');
     syncLearnedButton(currentIso);
     $('#content-pane').scrollTo({top:0, behavior:'smooth'});
@@ -348,49 +382,127 @@
     syncLearnedButton(currentIso);
   }
 
-  async function loadWiki(title){
-    // 1. Deutsch versuchen
-    try {
-      const r = await fetch(WIKI_API('de', title));
-      if (r.ok) {
-        const j = await r.json();
-        if (j && j.extract) return { ...j, lang:'de' };
-      }
-    } catch(e){}
-    // 2. Englisch versuchen
-    try {
-      const r = await fetch(WIKI_API('en', title));
-      if (r.ok) {
-        const j = await r.json();
-        if (j && j.extract) return { ...j, lang:'en' };
-      }
-    } catch(e){}
-    throw new Error('not_found');
+  const WIKI_PROPS = '&prop=extracts%7Cpageimages%7Cinfo&inprop=url&piprop=thumbnail&pithumbsize=360&exintro=1&redirects=1';
+  function pageToLead(p, lang){
+    if (!p || p.missing !== undefined || !p.extract) return null;
+    return {
+      title: p.title,
+      extract: p.extract,
+      thumb: p.thumbnail && p.thumbnail.source,
+      canonical: p.canonicalurl || p.fullurl || `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(p.title)}`,
+      lang
+    };
   }
 
-  function renderWikiOnly(wiki, name){
-    $('#c-region').textContent = 'Wikipedia · ' + (wiki.lang || '').toUpperCase();
-    $('#c-name').textContent = name;
+  // Exakter Titel-Treffer (DE, sonst EN) – präzise für Länder & Personen
+  async function wikiLead(title){
+    for (const lang of ['de','en']){
+      try {
+        const url = `https://${lang}.wikipedia.org/w/api.php?action=query&format=json&origin=*`
+          + WIKI_PROPS + `&titles=${encodeURIComponent(title)}`;
+        const r = await fetch(url);
+        if (!r.ok) continue;
+        const j = await r.json();
+        const pages = j.query && j.query.pages;
+        const lead = pages && pageToLead(Object.values(pages)[0], lang);
+        if (lead) return lead;
+      } catch(e){}
+    }
+    return null;
+  }
+
+  // Volltextsuche → bester Artikel (Fallback für Ereignistitel ohne exakten Artikel)
+  async function wikiSearch(query){
+    for (const lang of ['de','en']){
+      try {
+        const url = `https://${lang}.wikipedia.org/w/api.php?action=query&format=json&origin=*`
+          + `&generator=search&gsrsearch=${encodeURIComponent(query)}&gsrlimit=1` + WIKI_PROPS;
+        const r = await fetch(url);
+        if (!r.ok) continue;
+        const j = await r.json();
+        const pages = j.query && j.query.pages;
+        const lead = pages && pageToLead(Object.values(pages)[0], lang);
+        if (lead) return lead;
+      } catch(e){}
+    }
+    return null;
+  }
+
+  // Holt einen benannten Artikel-Abschnitt (z.B. "Geschichte") als bereinigtes HTML
+  async function wikiSection(title, lang, keyword){
+    try {
+      const sUrl = `https://${lang}.wikipedia.org/w/api.php?action=parse&format=json&origin=*&prop=sections&page=${encodeURIComponent(title)}`;
+      const sr = await fetch(sUrl);
+      if (!sr.ok) return null;
+      const sj = await sr.json();
+      const secs = (sj.parse && sj.parse.sections) || [];
+      const rx = new RegExp(keyword, 'i');
+      const hit = secs.find(s => s.toclevel === 1 && rx.test(s.line)) || secs.find(s => rx.test(s.line));
+      if (!hit) return null;
+      const tUrl = `https://${lang}.wikipedia.org/w/api.php?action=parse&format=json&origin=*&prop=text&disabletoc=1&page=${encodeURIComponent(title)}&section=${hit.index}`;
+      const tr = await fetch(tUrl);
+      if (!tr.ok) return null;
+      const tj = await tr.json();
+      const html = tj.parse && tj.parse.text && tj.parse.text['*'];
+      return html ? cleanWikiSection(html, lang) : null;
+    } catch(e){ return null; }
+  }
+
+  // Entfernt Tabellen/Bilder/Fußnoten/Bearbeiten-Links → saubere Lese-Prosa
+  function cleanWikiSection(html, lang){
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    tmp.querySelectorAll('table, figure, img, .thumb, .infobox, .navbox, .metadata, .mw-editsection, sup.reference, .reference, style, .hatnote, .mw-empty-elt, .noprint, .reflist, .mw-references-wrap, audio, .gallery').forEach(el => el.remove());
+    // Erste Überschrift entfernen (Tab heißt bereits "Geschichte")
+    const firstHead = tmp.querySelector('h1,h2,h3');
+    if (firstHead) firstHead.remove();
+    tmp.querySelectorAll('a').forEach(a => {
+      const h = a.getAttribute('href') || '';
+      if (h.startsWith('/')) a.setAttribute('href', `https://${lang}.wikipedia.org` + h);
+      a.setAttribute('target','_blank'); a.setAttribute('rel','noopener');
+    });
+    tmp.querySelectorAll('p').forEach(p => { if (!p.textContent.trim()) p.remove(); });
+    return tmp.innerHTML;
+  }
+
+  // Nicht-kuratiertes Land: umfangreicher Wikipedia-Inhalt statt leerer Tabs
+  async function renderWikiCountry(iso, fallbackName){
+    const title = WIKI_TITLES[iso] || fallbackName || iso;
+    renderLoading(fallbackName || title);
+    const lead = await wikiLead(title);
+    if (currentIso !== iso) return;                 // Nutzer hat inzwischen gewechselt
+    if (!lead){ renderWikiError(fallbackName || title, { message:'nicht gefunden' }); return; }
+
+    $('#c-region').textContent = 'Wikipedia · ' + lead.lang.toUpperCase();
+    $('#c-name').textContent = lead.title;
     $('#c-stats').innerHTML = '';
+    $('#key-dates').innerHTML = ''; $('#key-dates').hidden = true;
 
-    const img = wiki.thumbnail && wiki.thumbnail.source
-      ? `<img class="wiki-image" src="${wiki.thumbnail.source}" alt="${name}">` : '';
-
+    const img = lead.thumb ? `<img class="wiki-image" src="${lead.thumb}" alt="${lead.title}">` : '';
     $('#tab-overview').innerHTML = `
-      <div class="overview-hero">
-        ${img}
-        ${wiki.extract_html || wiki.extract || ''}
-      </div>
+      <div class="overview-hero">${img}${lead.extract}</div>
       <p class="hint" style="color:var(--text-3);font-size:13px;margin-top:14px">
-        Für dieses Land gibt es noch keine kuratierten Tiefen-Inhalte.
-        Mehr auf <a href="${wiki.content_urls?.desktop?.page || '#'}" target="_blank" rel="noopener" style="color:var(--accent)">Wikipedia</a>.
+        Für dieses Land gibt es (noch) keine handkuratierten Tiefen-Inhalte – der Text stammt live aus der Wikipedia.
+        Ganzer Artikel auf <a href="${lead.canonical}" target="_blank" rel="noopener" style="color:var(--accent)">Wikipedia ↗</a>.
       </p>
     `;
-    const placeholder = `<div class="hint" style="color:var(--text-3);padding:14px">Für dieses Land gibt es noch keine kuratierten Inhalte hier. Siehe Überblick / Wikipedia.</div>`;
-    ['tab-events','tab-wars','tab-people','tab-neighbors','tab-wealth','tab-facts']
-      .forEach(id => $('#'+id).innerHTML = placeholder);
+    configureTabs(['overview']);
     setActiveTab('overview');
+    syncLearnedButton(currentIso);
     $('#content-pane').scrollTo({top:0, behavior:'smooth'});
+
+    // Geschichte-Abschnitt nachladen (sofern vorhanden)
+    const hist = await wikiSection(title, lead.lang, 'Geschichte');
+    if (currentIso !== iso) return;
+    if (hist){
+      $('#tab-events').innerHTML = `
+        <h3>Geschichte</h3>
+        <div class="wiki-section">${hist}</div>
+        <p class="hint" style="color:var(--text-3);font-size:13px;margin-top:14px">
+          Quelle: <a href="${lead.canonical}" target="_blank" rel="noopener" style="color:var(--accent)">Wikipedia ↗</a>
+        </p>`;
+      configureTabs(['overview','events'], { events:'Geschichte' });
+    }
   }
 
   function renderWikiError(name, err){
@@ -400,7 +512,57 @@
     $('#tab-overview').innerHTML = `
       <div class="error-state">Konnte keine Wikipedia-Inhalte für <strong>${name}</strong> laden (${err.message}).</div>
     `;
+    configureTabs(['overview']);
+    setActiveTab('overview');
   }
+
+  // ---------- Detail-Fenster (Ereignisse & Personen) ----------
+  const detailModal = $('#detail-modal');
+  const detailBody = $('#detail-body');
+  let detailToken = 0;
+
+  function openDetail(opts){
+    const token = ++detailToken;
+    detailBody.innerHTML = `
+      <div class="dt-kicker">${opts.kicker || ''}</div>
+      <h2 class="dt-title">${opts.title || ''}</h2>
+      ${opts.meta ? `<div class="dt-meta">${opts.meta}</div>` : ''}
+      ${opts.lead ? `<p class="dt-lead">${opts.lead}</p>` : ''}
+      <div class="dt-wiki" id="dt-wiki"><div class="loading">Lade Wikipedia-Details</div></div>
+    `;
+    detailModal.hidden = false;
+    document.body.classList.add('modal-open');
+    detailBody.parentElement.scrollTop = 0;
+
+    const q = opts.wikiTitle || opts.title;
+    (async () => {
+      let w = null;
+      try { w = await wikiLead(q); if (!w) w = await wikiSearch(q); } catch(e){}
+      if (token !== detailToken) return;          // inzwischen anderes Detail geöffnet
+      const el = $('#dt-wiki');
+      if (!el) return;
+      if (!w){ el.innerHTML = detailMissHtml(q); return; }
+      el.innerHTML = `
+        <div class="dt-wiki-head">Aus der Wikipedia</div>
+        ${w.thumb ? `<img class="dt-img" src="${w.thumb}" alt="${w.title}">` : ''}
+        <div class="dt-extract">${w.extract}</div>
+        <a class="dt-link" href="${w.canonical}" target="_blank" rel="noopener">Ganzer Artikel auf Wikipedia ↗</a>
+      `;
+    })();
+  }
+  function detailMissHtml(q){
+    return `<p class="hint" style="color:var(--text-3)">Kein direkt passender Wikipedia-Artikel gefunden.
+      <a href="https://de.wikipedia.org/w/index.php?search=${encodeURIComponent(q)}" target="_blank" rel="noopener" style="color:var(--accent)">Auf Wikipedia suchen ↗</a></p>`;
+  }
+  function closeDetail(){
+    detailModal.hidden = true;
+    document.body.classList.remove('modal-open');
+  }
+  $('#detail-close').addEventListener('click', closeDetail);
+  $('#detail-backdrop').addEventListener('click', closeDetail);
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !detailModal.hidden) closeDetail();
+  });
 
   // ---------- Tabs ----------
   function setActiveTab(name){

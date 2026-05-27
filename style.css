@@ -440,6 +440,76 @@ body{
 .sr-item .sr-iso{color:var(--text-4);font-size:11px;float:right;margin-top:2px}
 .sr-item.curated::before{content:"★ ";color:var(--accent)}
 
+/* Klickbare Ereignis-/Personen-Karten + Hinweise ==================== */
+.tab-hint{color:var(--text-3);font-size:12.5px;margin:-4px 0 12px}
+.tl-item.is-clickable,.person.is-clickable{
+  cursor:pointer;position:relative;
+  transition:background .15s,border-color .15s,transform .1s;
+}
+.tl-item.is-clickable{grid-template-columns:80px 1fr 16px}
+.tl-item.is-clickable:hover{background:var(--surface-2);border-left-color:var(--accent-2);transform:translateY(-1px)}
+.person.is-clickable:hover{background:var(--surface-2);border-color:var(--accent);transform:translateY(-1px)}
+.tl-more{align-self:center;color:var(--accent);font-size:20px;font-weight:700;opacity:.5}
+.tl-item.is-clickable:hover .tl-more{opacity:1}
+.person-more{margin-top:8px;color:var(--accent);font-size:12px;font-weight:600;opacity:.7}
+.person.is-clickable:hover .person-more{opacity:1}
+
+/* DETAIL-FENSTER ==================================================== */
+body.modal-open{overflow:hidden}
+.detail-modal{position:fixed;inset:0;z-index:900;display:flex;align-items:center;justify-content:center;padding:24px}
+.detail-backdrop{position:absolute;inset:0;background:rgba(4,6,12,.72);backdrop-filter:blur(3px)}
+.detail-card{
+  position:relative;z-index:1;
+  width:min(680px,100%);max-height:86vh;overflow-y:auto;
+  background:linear-gradient(180deg,var(--surface),var(--bg-1));
+  border:1px solid var(--border-strong);
+  border-radius:16px;
+  box-shadow:var(--shadow-lg);
+  padding:26px 30px 30px;
+  scrollbar-width:thin;scrollbar-color:var(--surface-3) transparent;
+  animation:dtIn .22s ease;
+}
+.detail-card::-webkit-scrollbar{width:8px}
+.detail-card::-webkit-scrollbar-thumb{background:var(--surface-3);border-radius:4px}
+@keyframes dtIn{from{opacity:0;transform:translateY(10px) scale(.99)}to{opacity:1;transform:none}}
+.detail-close{
+  position:absolute;top:14px;right:16px;
+  width:36px;height:36px;border-radius:50%;
+  background:var(--surface-2);color:var(--text-2);
+  border:1px solid var(--border-strong);font-size:22px;cursor:pointer;
+}
+.detail-close:hover{background:var(--surface-3);color:var(--text)}
+.dt-kicker{text-transform:uppercase;letter-spacing:.16em;font-size:11px;color:var(--accent);font-weight:700;margin-bottom:6px}
+.dt-title{font-family:'Playfair Display',serif;font-size:28px;margin:0 0 6px;line-height:1.15;padding-right:36px}
+.dt-meta{color:var(--accent-2);font-size:13px;font-weight:600;margin-bottom:14px}
+.dt-lead{
+  color:var(--text);font-size:15.5px;line-height:1.6;
+  background:var(--surface-2);border-left:3px solid var(--accent);
+  padding:12px 16px;border-radius:10px;margin:0 0 18px;
+}
+.dt-wiki-head{
+  text-transform:uppercase;letter-spacing:.12em;font-size:11px;
+  color:var(--text-3);font-weight:700;margin-bottom:10px;
+  padding-top:6px;border-top:1px solid var(--border);
+}
+.dt-img{float:right;max-width:200px;border-radius:10px;border:1px solid var(--border);margin:0 0 12px 16px}
+.dt-extract{color:var(--text-2);font-size:14.5px;line-height:1.65}
+.dt-extract p{margin:0 0 10px}
+.dt-link{display:inline-block;margin-top:14px;color:var(--accent);font-size:13.5px;font-weight:600;text-decoration:none}
+.dt-link:hover{text-decoration:underline}
+
+/* Wikipedia-Abschnitt (Geschichte) bei nicht-kuratierten Ländern */
+.wiki-section{color:var(--text-2);font-size:14.5px;line-height:1.65}
+.wiki-section p{margin:0 0 12px}
+.wiki-section h2,.wiki-section h3,.wiki-section h4{
+  font-family:'Playfair Display',serif;color:var(--text);
+  font-size:17px;margin:18px 0 8px;
+}
+.wiki-section ul,.wiki-section ol{color:var(--text-2);line-height:1.6;padding-left:22px}
+.wiki-section li{margin-bottom:5px}
+.wiki-section a{color:var(--accent);text-decoration:none}
+.wiki-section a:hover{text-decoration:underline}
+
 /* ZEITREISE ========================================================= */
 #time-btn.is-active{
   background:linear-gradient(135deg,var(--accent),var(--accent-3));
