@@ -23,6 +23,7 @@
   </div>
   <div class="topbar-actions">
     <input id="search" type="search" placeholder="Land suchen … z.B. Türkei" autocomplete="off">
+    <button id="time-btn" title="Zeitreise – historische Grenzen">🕰️ Zeitreise</button>
     <button id="random-btn" title="Zufälliges Land">🎲 Zufall</button>
     <button id="progress-btn" title="Lernfortschritt">📊 <span id="progress-count">0</span></button>
   </div>
@@ -40,6 +41,21 @@
         <span class="dot dot-learned"></span> Gelernt
       </div>
     </div>
+
+    <!-- Zeitreise: Steuerleiste für historische Grenzen -->
+    <div id="time-controls" class="time-controls" hidden>
+      <div class="tc-row">
+        <button id="tc-prev" title="Früheres Jahr">⏮</button>
+        <button id="tc-play" title="Zeit abspielen">⏵</button>
+        <button id="tc-next" title="Späteres Jahr">⏭</button>
+        <div class="tc-year-wrap">
+          <div class="tc-year" id="tc-year">—</div>
+          <div class="tc-status" id="tc-status">Historische Grenzen</div>
+        </div>
+        <button id="tc-exit" title="Zeitreise beenden">✕</button>
+      </div>
+      <input type="range" id="tc-slider" min="0" max="0" step="1" value="0" aria-label="Jahr wählen">
+    </div>
   </section>
 
   <aside class="content-pane" id="content-pane">
@@ -51,21 +67,8 @@
         Du lernst dort die <strong>wichtigsten Ereignisse, Kriege und Personen</strong>,
         die <strong>Beziehungen zu den Nachbarn</strong> sowie <strong>Wohlstand & heutige Verhaltensmuster</strong>.
       </p>
-      <div class="welcome-grid">
-        <div class="welcome-card" data-iso="CHE">🇨🇭 Schweiz</div>
-        <div class="welcome-card" data-iso="DEU">🇩🇪 Deutschland</div>
-        <div class="welcome-card" data-iso="FRA">🇫🇷 Frankreich</div>
-        <div class="welcome-card" data-iso="USA">🇺🇸 USA</div>
-        <div class="welcome-card" data-iso="CHN">🇨🇳 China</div>
-        <div class="welcome-card" data-iso="JPN">🇯🇵 Japan</div>
-        <div class="welcome-card" data-iso="RUS">🇷🇺 Russland</div>
-        <div class="welcome-card" data-iso="TUR">🇹🇷 Türkei</div>
-        <div class="welcome-card" data-iso="IND">🇮🇳 Indien</div>
-        <div class="welcome-card" data-iso="BRA">🇧🇷 Brasilien</div>
-        <div class="welcome-card" data-iso="EGY">🇪🇬 Ägypten</div>
-        <div class="welcome-card" data-iso="GRC">🇬🇷 Griechenland</div>
-      </div>
-      <p class="hint">Tipp: für ca. 25 Länder gibt es ausführlich kuratierte Inhalte (orange Punkte). Alle anderen Länder werden live aus Wikipedia geladen.</p>
+      <div class="welcome-grid" id="welcome-grid"></div>
+      <p class="hint">Tipp: Diese Länder haben ausführlich kuratierte Inhalte (orange Punkte). Alle anderen Länder der Karte werden live aus Wikipedia geladen. Mit <strong>🕰️ Zeitreise</strong> oben siehst du, wie sich die Grenzen über die Jahrtausende verändert haben.</p>
     </div>
 
     <article id="country-view" hidden>

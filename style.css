@@ -440,6 +440,54 @@ body{
 .sr-item .sr-iso{color:var(--text-4);font-size:11px;float:right;margin-top:2px}
 .sr-item.curated::before{content:"★ ";color:var(--accent)}
 
+/* ZEITREISE ========================================================= */
+#time-btn.is-active{
+  background:linear-gradient(135deg,var(--accent),var(--accent-3));
+  color:#1a1108;border-color:var(--accent);font-weight:700;
+}
+body.time-mode .map-overlay{display:none}
+
+.time-controls{
+  position:absolute;left:50%;bottom:18px;transform:translateX(-50%);
+  z-index:550;width:min(460px,92%);
+  background:rgba(10,14,28,.92);
+  border:1px solid var(--border-strong);
+  border-radius:14px;
+  padding:12px 16px 14px;
+  box-shadow:var(--shadow-md);
+  backdrop-filter:blur(8px);
+}
+.tc-row{display:flex;align-items:center;gap:8px}
+.tc-row button{
+  background:var(--surface-2);color:var(--text);
+  border:1px solid var(--border-strong);
+  width:38px;height:38px;border-radius:9px;cursor:pointer;
+  font-size:15px;line-height:1;display:grid;place-items:center;flex-shrink:0;
+  transition:background .15s,transform .1s;
+}
+.tc-row button:hover{background:var(--surface-3)}
+.tc-row button:active{transform:translateY(1px)}
+#tc-play{background:linear-gradient(135deg,var(--accent),var(--accent-3));color:#1a1108;border-color:var(--accent)}
+#tc-exit{margin-left:auto;width:34px;height:34px;font-size:16px;color:var(--text-3)}
+#tc-exit:hover{color:var(--bad);border-color:var(--bad)}
+.tc-year-wrap{flex:1;text-align:center;min-width:0;padding:0 6px}
+.tc-year{
+  font-family:'Playfair Display',serif;font-weight:800;
+  font-size:22px;color:var(--accent-2);line-height:1.05;letter-spacing:.3px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.tc-status{font-size:11px;color:var(--text-3);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#tc-slider{width:100%;margin-top:12px;accent-color:var(--accent);cursor:pointer}
+
+.hist-tooltip{
+  background:rgba(10,14,28,.95) !important;color:var(--text) !important;
+  border:1px solid var(--border-strong) !important;border-radius:8px !important;
+  font-family:'Inter',sans-serif !important;font-size:12.5px !important;font-weight:600 !important;
+  padding:5px 9px !important;box-shadow:var(--shadow-sm) !important;
+}
+.leaflet-tooltip-top.hist-tooltip::before{border-top-color:rgba(10,14,28,.95)}
+.leaflet-tooltip-bottom.hist-tooltip::before{border-bottom-color:rgba(10,14,28,.95)}
+
 /* Leaflet country styles */
 .country-default{fill:#22304f;stroke:#0a0f1f;stroke-width:0.6;cursor:pointer}
 .country-curated{fill:#3d2f1c;stroke:#0a0f1f;stroke-width:0.6;cursor:pointer}

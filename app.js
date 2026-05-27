@@ -422,10 +422,21 @@
     map.flyTo([25,15], 2, { duration:0.6 });
   });
 
-  // ---------- Welcome-Karten ----------
-  document.querySelectorAll('.welcome-card').forEach(card => {
-    card.addEventListener('click', () => openCountry(card.dataset.iso, card.textContent.trim()));
-  });
+  // ---------- Welcome-Karten (dynamisch aus allen kuratierten Ländern) ----------
+  function buildWelcomeGrid(){
+    const grid = $('#welcome-grid');
+    if (!grid) return;
+    const entries = Object.entries(COUNTRIES_DATA)
+      .map(([iso,d]) => ({ iso, name:d.name, flag:d.flag || '' }))
+      .sort((a,b) => a.name.localeCompare(b.name,'de'));
+    grid.innerHTML = entries.map(e =>
+      `<div class="welcome-card" data-iso="${e.iso}">${e.flag} ${e.name}</div>`
+    ).join('');
+    grid.querySelectorAll('.welcome-card').forEach(card => {
+      card.addEventListener('click', () => openCountry(card.dataset.iso, card.textContent.trim()));
+    });
+  }
+  buildWelcomeGrid();
 
   // ---------- Zufallsland ----------
   $('#random-btn').addEventListener('click', () => {
@@ -560,5 +571,172 @@
       searchResults.hidden = true;
     }
   });
+
+  // ========================================================================
+  //  ZEITREISE — Historische Grenzen über die Zeit
+  //  Daten: aourednik/historical-basemaps (CC-BY-SA), Welt-GeoJSON je Stichjahr
+  // ========================================================================
+  const HIST_BASE = 'https://raw.githubusercontent.com/aourednik/historical-basemaps/master/geojson/world_';
+  const HIST_TOKENS = ['bc123000','bc10000','bc8000','bc5000','bc4000','bc3000','bc2000',
+    'bc1500','bc1000','bc700','bc500','bc400','bc323','bc300','bc200','bc100','bc1',
+    '100','200','300','400','500','600','700','800','900','1000','1100','1200','1279',
+    '1300','1400','1492','1500','1530','1600','1650','1700','1715','1783','1800','1815',
+    '1880','1900','1914','1920','1930','1938','1945','1960','1994','2000','2010'];
+
+  const HIST_YEARS = HIST_TOKENS.map(tok => {
+    const bc = tok.startsWith('bc');
+    const num = parseInt(bc ? tok.slice(2) : tok, 10);
+    let label;
+    if (bc) label = num.toLocaleString('de-DE') + ' v. Chr.';
+    else if (num < 1000) label = num + ' n. Chr.';
+    else label = String(num);
+    return { token: tok, label };
+  });
+
+  // Deutsche Namen für häufige historische Reiche/Entitäten (Fallback = Originalname)
+  const HIST_DE = {
+    'Roman Empire':'Römisches Reich', 'Western Roman Empire':'Weströmisches Reich',
+    'Eastern Roman Empire':'Oströmisches Reich', 'Byzantine Empire':'Byzantinisches Reich',
+    'Holy Roman Empire':'Heiliges Römisches Reich', 'Ottoman Empire':'Osmanisches Reich',
+    'Russian Empire':'Russisches Kaiserreich', 'Russia':'Russland', 'Soviet Union':'Sowjetunion',
+    'Mongol Empire':'Mongolisches Reich', 'Persian Empire':'Persisches Reich',
+    'Achaemenid Empire':'Achämenidenreich', 'Sasanian Empire':'Sassanidenreich',
+    'Parthian Empire':'Partherreich', 'Macedon':'Makedonien', 'Macedonia':'Makedonien',
+    'Carthage':'Karthago', 'Gaul':'Gallien', 'Ptolemaic Kingdom':'Ptolemäerreich',
+    'Egypt':'Ägypten', 'Greece':'Griechenland', 'Han Empire':'Han-Reich', 'Han dynasty':'Han-Dynastie',
+    'Tang dynasty':'Tang-Dynastie', 'Ming dynasty':'Ming-Dynastie', 'Qing Empire':'Qing-Reich',
+    'Qing dynasty':'Qing-Dynastie', 'China':'China', 'Japan':'Japan', 'Imperial Japan':'Kaiserreich Japan',
+    'British Empire':'Britisches Weltreich', 'United Kingdom':'Vereinigtes Königreich',
+    'Great Britain':'Großbritannien', 'England':'England', 'France':'Frankreich',
+    'Kingdom of France':'Königreich Frankreich', 'Spain':'Spanien', 'Spanish Empire':'Spanisches Weltreich',
+    'Portugal':'Portugal', 'Portuguese Empire':'Portugiesisches Weltreich',
+    'Austria-Hungary':'Österreich-Ungarn', 'Austrian Empire':'Kaisertum Österreich',
+    'Habsburg Monarchy':'Habsburgermonarchie', 'Prussia':'Preußen', 'German Empire':'Deutsches Kaiserreich',
+    'Germany':'Deutschland', 'Nazi Germany':'Deutsches Reich (NS)', 'Italy':'Italien',
+    'Kingdom of Italy':'Königreich Italien', 'Papal States':'Kirchenstaat',
+    'Republic of Venice':'Republik Venedig', 'United States':'Vereinigte Staaten',
+    'United States of America':'Vereinigte Staaten', 'Mexico':'Mexiko', 'Brazil':'Brasilien',
+    'Inca Empire':'Inkareich', 'Aztec Empire':'Aztekenreich', 'Poland':'Polen',
+    'Polish-Lithuanian Commonwealth':'Polen-Litauen', 'Poland-Lithuania':'Polen-Litauen',
+    'Sweden':'Schweden', 'Denmark':'Dänemark', 'Norway':'Norwegen', 'Netherlands':'Niederlande',
+    'Dutch Republic':'Republik der Niederlande', 'Switzerland':'Schweiz', 'India':'Indien',
+    'Mughal Empire':'Mogulreich', 'Maurya Empire':'Maurya-Reich', 'Gupta Empire':'Gupta-Reich',
+    'Kievan Rus':'Kiewer Rus', 'Caliphate':'Kalifat', 'Umayyad Caliphate':'Umayyaden-Kalifat',
+    'Abbasid Caliphate':'Abbasiden-Kalifat', 'Rashidun Caliphate':'Raschidun-Kalifat',
+    'Frankish Empire':'Frankenreich', 'Carolingian Empire':'Karolingerreich',
+    'Ethiopia':'Äthiopien', 'Mali Empire':'Mali-Reich', 'Songhai Empire':'Songhai-Reich',
+    'Korea':'Korea', 'Joseon':'Joseon (Korea)', 'Vietnam':'Vietnam', 'Siam':'Siam',
+    'Khmer Empire':'Khmer-Reich', 'Ukraine':'Ukraine', 'Turkey':'Türkei'
+  };
+
+  function histName(props){
+    const raw = (props && (props.NAME || props.SUBJECTO || props.PARTOF)) || 'Unbekannt';
+    return HIST_DE[raw] || raw;
+  }
+  // Stabile Farbe pro Entität (Name-Hash → HSL)
+  function histColor(name){
+    let h = 0;
+    for (let i=0;i<name.length;i++){ h = (h*31 + name.charCodeAt(i)) % 360; }
+    return `hsl(${h}, 52%, 56%)`;
+  }
+
+  const histCache = new Map();    // token → parsed GeoJSON
+  let histLayer = null;
+  let timeMode = false;
+  let timeIdx = Math.max(0, HIST_TOKENS.indexOf('1914'));
+  let playTimer = null;
+
+  const timeBtn = $('#time-btn');
+  const timeControls = $('#time-controls');
+  const tcSlider = $('#tc-slider');
+  const tcYear = $('#tc-year');
+  const tcStatus = $('#tc-status');
+  const tcPlay = $('#tc-play');
+  tcSlider.max = HIST_YEARS.length - 1;
+
+  function enterTimeMode(){
+    if (timeMode) return;
+    timeMode = true;
+    document.body.classList.add('time-mode');
+    timeControls.hidden = false;
+    timeBtn.classList.add('is-active');
+    if (geoLayer) map.removeLayer(geoLayer);
+    map.flyTo([20,10], 2, { duration:0.5 });
+    showYear(timeIdx);
+  }
+  function exitTimeMode(){
+    if (!timeMode) return;
+    stopPlay();
+    timeMode = false;
+    document.body.classList.remove('time-mode');
+    timeControls.hidden = true;
+    timeBtn.classList.remove('is-active');
+    if (histLayer){ map.removeLayer(histLayer); histLayer = null; }
+    if (geoLayer) geoLayer.addTo(map);
+  }
+
+  async function loadHistYear(token){
+    if (histCache.has(token)) return histCache.get(token);
+    const r = await fetch(HIST_BASE + token + '.geojson');
+    if (!r.ok) throw new Error('http '+r.status);
+    const data = await r.json();
+    histCache.set(token, data);
+    return data;
+  }
+
+  function drawHistLayer(data){
+    if (histLayer){ map.removeLayer(histLayer); histLayer = null; }
+    histLayer = L.geoJSON(data, {
+      style: f => ({
+        fillColor: histColor(histName(f.properties)),
+        color:'#0a0f1f', weight:0.6, fillOpacity:0.5
+      }),
+      onEachFeature: (f, layer) => {
+        layer.bindTooltip(histName(f.properties), { sticky:true, direction:'top', className:'hist-tooltip' });
+        layer.on({
+          mouseover: () => { layer.setStyle({ weight:1.6, color:'#fff', fillOpacity:0.72 }); layer.bringToFront(); },
+          mouseout:  () => { layer.setStyle({ weight:0.6, color:'#0a0f1f', fillOpacity:0.5 }); }
+        });
+      }
+    }).addTo(map);
+  }
+
+  async function showYear(idx){
+    idx = Math.max(0, Math.min(HIST_YEARS.length-1, idx));
+    timeIdx = idx;
+    const y = HIST_YEARS[idx];
+    tcYear.textContent = y.label;
+    tcSlider.value = idx;
+    tcStatus.textContent = 'Lade Karte …';
+    let data;
+    try { data = await loadHistYear(y.token); }
+    catch(e){
+      if (timeIdx === idx) tcStatus.textContent = 'Für dieses Jahr nicht verfügbar';
+      return;
+    }
+    if (timeIdx !== idx) return;   // Slider weitergezogen → veraltetes Ergebnis verwerfen
+    drawHistLayer(data);
+    tcStatus.textContent = (data.features || []).length + ' politische Gebilde · zum Vergrößern scrollen';
+  }
+
+  function startPlay(){
+    if (playTimer) return;
+    tcPlay.textContent = '⏸'; tcPlay.title = 'Pause';
+    playTimer = setInterval(() => {
+      if (timeIdx >= HIST_YEARS.length-1){ stopPlay(); return; }
+      showYear(timeIdx + 1);
+    }, 1900);
+  }
+  function stopPlay(){
+    if (playTimer){ clearInterval(playTimer); playTimer = null; }
+    tcPlay.textContent = '⏵'; tcPlay.title = 'Zeit abspielen';
+  }
+
+  timeBtn.addEventListener('click', () => timeMode ? exitTimeMode() : enterTimeMode());
+  $('#tc-exit').addEventListener('click', exitTimeMode);
+  $('#tc-prev').addEventListener('click', () => { stopPlay(); showYear(timeIdx - 1); });
+  $('#tc-next').addEventListener('click', () => { stopPlay(); showYear(timeIdx + 1); });
+  tcPlay.addEventListener('click', () => playTimer ? stopPlay() : startPlay());
+  tcSlider.addEventListener('input', e => { stopPlay(); showYear(parseInt(e.target.value,10)); });
 
 })();
